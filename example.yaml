@@ -1,0 +1,157 @@
+substitutions:
+  device_name: esp32-test
+  device_verbose_name: "esp32-test"
+  ip: 192.168.1.63
+  
+esphome:
+  name: ${device_name}
+  platform: ESP32
+  board: esp32dev
+
+packages:
+  wifi: !include includes/wifi.yaml
+  config: !include includes/config.yaml
+  ha: !include includes/ha.yaml
+
+external_components:
+  - source: github://pr#3625
+    components: [ gc9a01 ]
+  - source:
+      type: local
+      path: components_test
+    components: [gauge,display]
+    
+logger:
+  level: ERROR # DEBUG
+
+web_server:
+  port: 80
+
+spi:
+  mosi_pin: 23
+  clk_pin: 18
+
+sensor:
+    
+  - platform: homeassistant
+    entity_id: sensor.me3000sp_battery_soc
+    id: me3000sp_battery_soc
+    unit_of_measurement: "%"
+
+  - platform: homeassistant
+    entity_id: input_number.battery_target_soc
+    id: battery_target_soc
+    unit_of_measurement: "%"
+
+  - platform: homeassistant
+    entity_id: sensor.seplos_bms_discharging_power
+    id: seplos_bms_discharging_power
+    unit_of_measurement: "W"
+
+  - platform: homeassistant
+    entity_id: sensor.seplos_bms_charging_power
+    id: seplos_bms_charging_power
+    unit_of_measurement: "W"
+
+  - platform: homeassistant
+    entity_id: sensor.me3000sp_load_power
+    id: me3000sp_load_power
+    unit_of_measurement: "W"
+
+
+text_sensor:
+    
+  - platform: homeassistant
+    entity_id: sensor.me3000sp_run_state
+    id: me3000sp_run_state
+
+  - platform: homeassistant
+    entity_id: select.me3000sp_mode
+    id: me3000sp_mode
+    
+    
+font:
+
+  - file: "fonts/verdana.ttf"
+    id: verdana12
+    size: 12
+    glyphs: "!\"%()+,-_.:°@0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz~"
+  
+  - file: "fonts/verdana.ttf"
+    id: verdana20
+    size: 20
+    glyphs: "!\"%()+,-_.:°@0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz~"
+  
+  - file: "fonts/verdanab.ttf"
+    id: verdanab30
+    size: 30
+    glyphs: "!\"%()+,-_.:°@0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz~"
+  
+globals:
+  - id: gauge_max
+    type: int
+    initial_value: '1000'
+
+display:
+- platform: gc9a01
+  reset_pin: 25 # not used
+  cs_pin: 5
+  dc_pin: 21
+  rotation: 180
+  lambda: |-
+    auto red = Color(255, 0, 0);
+    auto green = Color(0, 255, 0);
+    auto amber = Color(255, 194, 0);
+    auto blue = Color(0, 0, 255);
+    auto white = Color(255, 255, 255);
+    auto black = Color(0, 0, 0);
+
+    auto textcolor = white;
+
+    if (id(me3000sp_run_state).state == "Charging")
+      textcolor = green;
+    else if (id(me3000sp_run_state).state == "Discharging")
+      textcolor = red;
+    else if (id(me3000sp_run_state).state == "Wait")
+      textcolor = blue;
+      
+    it.filled_rectangle(0,0,it.get_width(), it.get_height(), black);
+    
+    it.print(it.get_width() / 2, (it.get_height() / 2) - 40, id(verdana20), textcolor, TextAlign::TOP_CENTER, id(me3000sp_run_state).state.c_str() );
+    it.printf(it.get_width() / 2, (it.get_height() / 2), id(verdanab30), TextAlign::CENTER, "%.0f%%", id(me3000sp_battery_soc).state );
+
+    if (id(me3000sp_mode).state == "charge")
+      it.printf(it.get_width() / 2, (it.get_height() / 2) + 20, id(verdana12), TextAlign::TOP_CENTER, "Target: %.0f%%", id(battery_target_soc).state );
+    
+    it.gauge(0, 0, id(gauge_bms_charging_power), green, amber, red, white);
+    it.gauge(0, 0, id(gauge_bms_discharging_power), green, amber, red, white);
+  
+gauge:
+  - id: gauge_bms_discharging_power
+    sensor: seplos_bms_discharging_power
+    max_value: 3000
+    min_value: 0
+    segments: 5
+    value_font: verdana12
+    name_font: verdana12
+    rotation: 190 # 180 + 10
+    size: 160
+    #direction: 
+    #reversed:     
+    width: 240
+    height: 240
+
+  - id: gauge_bms_charging_power
+    sensor: seplos_bms_charging_power
+    max_value: 3000
+    min_value: 0
+    segments: 5
+    value_font: verdana12
+    name_font: verdana12
+    rotation: 10
+    size: 160
+    #direction: 
+    #reversed:     
+    width: 240
+    height: 240
+
